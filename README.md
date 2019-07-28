@@ -1,7 +1,8 @@
 
-# Welcome to your CDK Python project!
+# CDK Python Kubernetes the (right) hard way on AWS!
 
-This is a blank project for Python development with CDK.
+This little project creates the infrastructure in CDK Python for my blog post _"Kubernetes the (right) hard way on AWS"_.
+
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
