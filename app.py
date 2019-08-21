@@ -2,10 +2,9 @@
 
 from aws_cdk import core
 
-from cdk_python_k8s_right_way_aws.cdk_python_k8s_right_way_aws_stack import CdkPythonK8SRightWayAwsStack
-
+from cdk_python_k8s_right_way_aws.cdk_python_k8s_right_way_aws_stack import CdkPythonK8SRightWayAwsStack, aws_region, aws_account
 
 app = core.App()
-CdkPythonK8SRightWayAwsStack(app, "cdk-python-k8s-right-way-aws")
+CdkPythonK8SRightWayAwsStack(app, "cdk-python-k8s-right-way-aws", env={'account': aws_account, 'region': aws_region})
 
 app.synth()
