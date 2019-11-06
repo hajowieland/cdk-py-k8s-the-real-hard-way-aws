@@ -3,6 +3,30 @@
 
 This little project creates the infrastructure in CDK Python for my blog post _"Kubernetes the (right) hard way on AWS"_.
 
+You can practice creating a multi node K8s Cluster yourself for training purposes or CKA exam preparation.
+
+
+![Alt text](cdk-python-k8s-real-hard-way.png?raw=true "Infrastructure Diagram")
+
+## Requirements
+
+* Existing AWS EC2 Key Pair
+* Existing AWS Route53 Public Hosted Zone
+
+## Features
+
+* 1x VPC, 3x Public Subnets, Route Tables, Routes
+* 3x Worker Nodes _(editable)_
+* 3x Master Nodes _(editable)_
+* 3x Etcd Nodes _(editable)_
+* Route53 Records for internal & external IPv4 addresses
+* LoadBalancer for Master Node (external kubectl access)
+* Gets most recent Ubuntu AMI for all regions
+* Install awscli, cfssl, cfssl_json via UserData
+* Allows external access from workstation IPv4 address only
+
+
+## CDK Python Tutorial
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
