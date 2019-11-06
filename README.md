@@ -1,7 +1,7 @@
 
 # CDK Python Kubernetes the (right) hard way on AWS!
 
-This little project creates the infrastructure in CDK Python for my blog post _"Kubernetes the (right) hard way on AWS"_.
+This little project creates the infrastructure in CDK Python for my blog post [Kubernetes the (right) hard way on AWS](https://napo.io/posts/kubernetes-the-right-hard-way-on-aws/).
 
 You can practice creating a multi node K8s Cluster yourself for training purposes or CKA exam preparation.
 
@@ -15,6 +15,7 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 
 ## Features
 
+* AWS CDK Python
 * 1x VPC, 3x Public Subnets, Route Tables, Routes
 * 3x Worker Nodes _(editable)_
 * 3x Master Nodes _(editable)_
