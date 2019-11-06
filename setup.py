@@ -7,9 +7,9 @@ with open("README.md") as fp:
 
 setuptools.setup(
     name="cdk_python_k8s_right_way_aws",
-    version="0.0.1",
+    version="1.0.0",
 
-    description="An empty CDK Python app",
+    description="Kubernetes The Real Hard Way (AWS) CDK Python app",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
