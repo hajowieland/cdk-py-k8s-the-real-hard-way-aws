@@ -30,7 +30,22 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 * Allows external access from workstation IPv4 address only
 
 
-## CDK Python Tutorial
+## Required Variables
+
+| Name | Description | Type | Default |
+|------|-------------|:----:|:-----:|
+| aws\_account | AWS account ID to deploy infrastructure | string | `''` |
+| aws\_region | AWS region | string | `'us-east-1'` |
+| etcd\_nodes | Number of etcd nodes | int | `3` | 
+| master\_nodes | Number of Kubernetes master nodes | int | `3` |
+| ssh\_key\_pair | AWS EC2 Key Pair name | string | `''` |
+| vpc\_cidr | AWS VPC network CIDR | string | `'10.5.0.0/16'` |
+| worker\_nodes | Number of Kubenretes worker nodes | int | `3` |
+| zone\_fqdn | AWS Route53 Hosted Zone name | string | `''` |
+
+
+
+### CDK Python Tutorial
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
@@ -76,7 +91,7 @@ To add additional dependencies, for example other CDK libraries, just add
 them to your `setup.py` file and rerun the `pip install -r requirements.txt`
 command.
 
-# Useful commands
+### Useful commands
 
  * `cdk ls`          list all stacks in the app
  * `cdk synth`       emits the synthesized CloudFormation template
