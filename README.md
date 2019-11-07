@@ -30,7 +30,7 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 * Allows external access from workstation IPv4 address only
 
 
-## Required Variables
+## Variables
 
 | Name | Description | Type | Default |
 |------|-------------|:----:|:-----:|
