@@ -47,6 +47,7 @@ fabric.properties
 
 # pycache
 __pycache__
+*.egg-info/
 
 # env
 .env
