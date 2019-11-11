@@ -439,6 +439,29 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         master.add_security_group(master_securiy_group)
         worker.add_security_group(worker_security_group)
 
+        # Elastic Network Interfaces
+        i = 1
+        while i <= worker_max_capacity:
+            eni = ec2.CfnNetworkInterface(
+                self,
+                "eni" + str(i),
+                subnet_id=str(ec2.SubnetSelection(
+                    one_per_az=True,
+                    subnet_type=ec2.SubnetType.PRIVATE,
+                ).subnet_group_name),
+                description="ENI K8s Worker nodes",
+                tags=[
+                    core.CfnTag(
+                        key="Project",
+                        value=tag_project),
+                    core.CfnTag(
+                        key="Owner",
+                        value=tag_owner)
+                ],
+                private_ip_address='10.5.' + str(i) + '.100'
+            )
+            i += 1
+
         # Add specific Tags to resources
         core.Tag.add(
             bastion,
@@ -476,4 +499,3 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             key='Name',
             value=tag_project + '-k8s-worker'
         )
-
