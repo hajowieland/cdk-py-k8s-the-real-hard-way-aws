@@ -19,15 +19,17 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 ## Features
 
 * AWS CDK Python
-* 1x VPC, 3x Public Subnets, Route Tables, Routes
+* 1x VPC, 3x Public Subnets, 3x Private Subnets, Route Tables, Routes
 * 3x Worker Nodes _(editable)_
 * 3x Master Nodes _(editable)_
 * 3x Etcd Nodes _(editable)_
+* 1x Bastion Host
 * Route53 Records for internal & external IPv4 addresses
-* LoadBalancer for Master Node (external kubectl access)
+* 1x Public LoadBalancer for Master Nodes (external kubectl access)
+* 1x Private LoadBalancer for Master Nodes (fronting kube-apiservers)
 * Gets most recent Ubuntu AMI for all regions
 * Install awscli, cfssl, cfssl_json via UserData
-* Allows external access from workstation IPv4 address only
+* Allows external access from workstation IPv4 address only (to Bastion & MasterPublicLB)
 
 
 ## Variables
@@ -36,11 +38,27 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 |------|-------------|:----:|:-----:|
 | aws\_account | AWS account ID to deploy infrastructure | string | `''` |
 | aws\_region | AWS region | string | `'us-east-1'` |
-| etcd\_nodes | Number of etcd nodes | int | `3` | 
-| master\_nodes | Number of Kubernetes master nodes | int | `3` |
+| bastion\_desired\_capacity | Bastion ASG desired nodes | int | 1 |
+| bastion\_instance\_type | Bastion EC2 instance type | string | `'t3a.small'` |
+| bastion\_min\_capacity | Bastion ASG min. nodes | int | 1 |
+| bastion\_max\_capacity | Bastion ASG max. nodes | int | 1 |
+| etcd\_desired\_capacity | etcd ASG desired nodes | int | 3 |
+| etcd\_instance\_type | etcd EC2 instance type | string | `'t3a.small'` |
+| etcd\_min\_capacity | etcd ASG min. nodes | int | 3 |
+| etcd\_max\_capacity | etcd ASG max. nodes | int | 3 |
+| master\_desired\_capacity | K8s-Master ASG desired nodes | int | 3 |
+| master\_instance\_type | K8s-Master EC2 instance type | string | `'t3a.small'` |
+| master\_min\_capacity | K8s-Master ASG min. nodes | int | 3 |
+| master\_max\_capacity | K8s-Master ASG max. nodes | int | 3 |
+| worker\_desired\_capacity | K8s-Worker ASG desired nodes | int | 3 |
+| worker\_instance\_type | K8s-Worker EC2 instance type | string | `'t3a.small'` |
+| worker\_min\_capacity | K8s-Worker ASG min. nodes | int | 3 |
+| worker\_max\_capacity | K8s-Worker ASG max. nodes | int | 3 |
 | ssh\_key\_pair | AWS EC2 Key Pair name | string | `''` |
+| pod\_cidr | Pod CIDR network first octets (for `POD_CIDR` envvar) | string | `'10.200'` |
+| tag\_owner | Owner Tag for all resources | string | `'napo.io'` |
+| tag\_project | Project Tag for all resources | string | `'k8s-the-right-hard-way-aws'` |
 | vpc\_cidr | AWS VPC network CIDR | string | `'10.5.0.0/16'` |
-| worker\_nodes | Number of Kubenretes worker nodes | int | `3` |
 | zone\_fqdn | AWS Route53 Hosted Zone name | string | `''` |
 
 
