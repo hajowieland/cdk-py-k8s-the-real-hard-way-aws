@@ -7,14 +7,13 @@ from aws_cdk import (
     aws_iam as iam,
     core,
 )
-import json
+
 from requests import get
 import boto3
 from operator import itemgetter
 
 # ---------------------------------------------------------
 # TODO
-# - remove repeated code in userdata, route53 json
 # - flannel CNI
 # ---------------------------------------------------------
 # Configuration Variables
@@ -36,18 +35,21 @@ aws_region = 'us-east-1'
 # Get your workstation IPv4 address
 myipv4 = get('https://api.ipify.org').text + "/32"
 
+# Configure your AWS key pair name here
+ssh_key_pair = ''
+
 # Set VPC CIDR
 vpc_cidr = '10.5.0.0/16'
+
+# FQDN of the hosted zone to create Route53 records in
+# Example: test.example.com
+zone_fqdn = ''
 
 # Flannel CNI CIDR
 # flannel_cidr = '10.244.0.0/16'
 
-# Configure your AWS key pair name here
-ssh_key_pair = ''
-
-# FQDN of the hosted zone to create Route53 records in
-# Example: test.example.com.
-zone_fqdn = ''
+# Pod CIDR range, exported as POD_CIDR in Worker nodes UserData
+pod_cidr = '10.200'
 
 # Bastion Host
 bastion_min_capacity = 1
@@ -118,7 +120,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # VPC
         vpc = ec2.Vpc(
             self,
-            'k8s-real-hard-way-vpc',
+            'k8s-right-hard-way-vpc',
             cidr=vpc_cidr,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
@@ -145,22 +147,37 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Get HostedZone ID from HostedZone Name
         zoneid = route53.HostedZone.from_lookup(
             self,
-            "k8s-real-hard-way-zone",
+            "k8s-right-hard-way-zone",
             domain_name=zone_fqdn
         )
+        zoneid_str = zoneid.hosted_zone_id
 
-        # IAM Policy for Instance Profile
+        # IAM Policy for Bastion Instance Profile
         iampolicystatement = iam.PolicyStatement(
             actions=[
                 "ec2:CreateRoute",
+                "ec2:CreateTags",
+                "ec2:DescribeAutoScalingGroups",
+                "autoscaling:DescribeAutoScalingInstances",
+                "ec2:DescribeRegions",
                 "ec2:DescribeRouteTables",
                 "ec2:DescribeInstances",
                 "ec2:DescribeTags",
-                "elasticloadbalancing:DescribeLoadBalancers"
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "route53:ListHostedZonesByName"
             ],
             effect=iam.Effect.ALLOW,
             resources=[
                 "*"
+            ]
+        )
+        iampolicystatement_route53 = iam.PolicyStatement(
+            actions=[
+                "route53:ChangeResourceRecordSets"
+            ],
+            effect=iam.Effect.ALLOW,
+            resources=[
+                "arn:aws:route53:::" + zoneid_str[1:]
             ]
         )
         # BASTION HOST
@@ -181,6 +198,12 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             associate_public_ip_address=False
         )
         bastion.add_to_role_policy(iampolicystatement)
+        bastion.add_to_role_policy(iampolicystatement_route53)
+
+        cfn_bastion = bastion.node.default_child
+        cfn_bastion.auto_scaling_group_name = "bastion"
+        cfn_bastion_lc = bastion.node.find_child('LaunchConfig')
+        cfn_bastion_lc.launch_configuration_name = "bastion"
 
         # Classic LoadBalancer
         bastion_lb = elb.LoadBalancer(
@@ -193,24 +216,15 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
                 protocol=elb.LoadBalancingProtocol.TCP
             )
         )
-        # Security Group and rules for Bastion LB
-        bastion_lb_sg = ec2.SecurityGroup(
-            self,
-            "bastion-lb-sg",
-            vpc=vpc,
-            allow_all_outbound=True,
-            description="Bastion LB",
-        )
-        bastion_lb_sg.add_ingress_rule(
-            peer=ec2.Peer().ipv4(myipv4),
-            connection=ec2.Port.tcp(22),
-        )
+
+        cfn_bastion_lb = bastion_lb.node.default_child
+        cfn_bastion_lb.load_balancer_name = "bastion"
+
         bastion_lb.add_listener(
             external_port=22,
             external_protocol=elb.LoadBalancingProtocol.TCP,
             allow_connections_from=[ec2.Peer().ipv4(myipv4)]
         )
-
         bastion_lb.add_target(
             target=bastion
         )
@@ -218,19 +232,15 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         bastion.add_user_data(
             "sudo yum update",
             "sudo yum upgrade -y",
-            "sudo yum install tmux -y",
+            "sudo yum install jq tmux -y",
             "wget https://gist.githubusercontent.com/dmytro/3984680/raw/1e25a9766b2f21d7a8e901492bbf9db672e0c871/ssh-multi.sh -O /home/ec2-user/tmux-multi.sh",
-            "chmod +x /home/ec2-user/tmux-multi.sh"
-            "wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64",
-            "chmod +x cfssl_linux-amd64",
-            "sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl",
-            "wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64",
-            "chmod +x cfssljson_linux-amd64",
-            "sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson",
-            "curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl",
-            "chmod +x ./kubectl",
-            "sudo mv kubectl /usr/local/bin/kubectl",
+            "chmod +x /home/ec2-user/tmux-multi.sh",
+            "wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 && chmod +x cfssl_linux-amd64 && sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl && sudo chown ec2-user:ec2-user /usr/local/bin/cfssl",
+            "wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 && chmod +x cfssljson_linux-amd64 && sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson && sudo chown ec2-user:ec2-user /usr/local/bin/cfssljson",
+            "curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x ./kubectl && sudo mv kubectl /usr/local/bin/kubectl && chown ec2-user:ec2-user /usr/local/bin/kubectl",
             "sudo hostname " + "bastion" + "." + zone_fqdn,
+            "echo \"AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\\\" '{print $4}')\" | sudo tee -a /etc/environment",
+            "echo \"HOSTEDZONE_NAME=" + zone_fqdn + "\" | sudo tee -a /etc/environment"
         )
         # Route53 Alias Target for LB
         route53_target = route53_targets.ClassicLoadBalancerTarget(bastion_lb)
@@ -261,17 +271,29 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             ),
             associate_public_ip_address=False
         )
+        etcd.add_to_role_policy(iampolicystatement)
+
+        cfn_etcd = etcd.node.default_child
+        cfn_etcd.auto_scaling_group_name = "etcd"
+        cfn_etcd_lc = etcd.node.find_child('LaunchConfig')
+        cfn_etcd_lc.launch_configuration_name = "etcd"
+
         # UserData
         etcd.add_user_data(
             "sudo apt-get update",
-            "sudo apt-get upgrade -y"
+            "sudo apt-get upgrade -y",
+            "sudo apt-get install python3-pip -y",
+            "sudo pip3 install awscli",
+            "echo \"AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\\\" '{print $4}')\" | sudo tee -a /etc/environment",
+            "echo \"HOSTEDZONE_NAME=" + zone_fqdn + "\" | sudo tee -a /etc/environment",
+            "echo \"INTERNAL_IP=$(curl -s http://169.254.169.254/1.0/meta-data/local-ipv4)\" | sudo tee -a /etc/environment"
         )
 
-        # KUBERNETES MASTER
-        # Load Balancer fronting Kubernetes Master nodes (for remote kubectl access)
-        master_lb = elb.LoadBalancer(
+        # KUBERNETES MASTER Load Balancer
+        # Public Load Balancer (for remote kubectl access)
+        master_public_lb = elb.LoadBalancer(
             self,
-            "k8s-real-hard-way-master-lb",
+            "k8s-right-hard-way-master-public-lb",
             vpc=vpc,
             internet_facing=True,
             health_check=elb.HealthCheck(
@@ -279,11 +301,35 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
                 protocol=elb.LoadBalancingProtocol.TCP
             )
         )
-        master_lb.add_listener(
+        master_public_lb.add_listener(
             external_port=6443,
             external_protocol=elb.LoadBalancingProtocol.TCP,
             allow_connections_from=[ec2.Peer().ipv4(myipv4)]
         )
+
+        cfn_master_public_lb = master_public_lb.node.default_child
+        cfn_master_public_lb.load_balancer_name = "master-public"
+
+        # Private Load Balancer (fronting kube-apiservers)
+        master_private_lb = elb.LoadBalancer(
+            self,
+            "k8s-right-hard-way-master-private-lb",
+            vpc=vpc,
+            internet_facing=False,
+            health_check=elb.HealthCheck(
+                port=6443,
+                protocol=elb.LoadBalancingProtocol.TCP
+            )
+        )
+        master_private_lb.add_listener(
+            external_port=6443,
+            external_protocol=elb.LoadBalancingProtocol.TCP,
+            allow_connections_from=[]
+        )
+
+        cfn_master_private_lb = master_private_lb.node.default_child
+        cfn_master_private_lb.load_balancer_name = "master-private"
+
         # AutoScalingGroup
         master = autoscaling.AutoScalingGroup(
             self,
@@ -300,14 +346,29 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             ),
             associate_public_ip_address=False
         )
-        # Add ASG as target for LB
-        master_lb.add_target(
+        master.add_to_role_policy(iampolicystatement)
+
+        cfn_master = master.node.default_child
+        cfn_master.auto_scaling_group_name = "master"
+        cfn_master_lc = master.node.find_child('LaunchConfig')
+        cfn_master_lc.launch_configuration_name = "master"
+
+        # Add ASG as target for LBs
+        master_public_lb.add_target(
+            target=master
+        )
+        master_private_lb.add_target(
             target=master
         )
         # UserData
         master.add_user_data(
             "sudo apt-get update",
             "sudo apt-get upgrade -y",
+            "sudo apt-get install python3-pip -y",
+            "sudo pip3 install awscli",
+            "echo \"AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\\\" '{print $4}')\" | sudo tee -a /etc/environment",
+            "echo \"HOSTEDZONE_NAME=" + zone_fqdn + "\" | sudo tee -a /etc/environment",
+            "echo \"INTERNAL_IP=$(curl -s http://169.254.169.254/1.0/meta-data/local-ipv4)\" | sudo tee -a /etc/environment"
         )
 
         # KUBERNETES WORKER
@@ -326,39 +387,66 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             ),
             associate_public_ip_address=False
         )
+        worker.add_to_role_policy(iampolicystatement)
+
+        cfn_worker = worker.node.default_child
+        cfn_worker.auto_scaling_group_name = "worker"
+        cfn_worker_lc = worker.node.find_child('LaunchConfig')
+        cfn_worker_lc.launch_configuration_name = "worker"
+
         # UserData
         worker.add_user_data(
             "sudo apt-get update",
             "sudo apt-get upgrade -y",
+            "sudo apt-get install python3-pip -y",
+            "sudo pip3 install awscli",
+            "RANDOM_NUMBER=$(shuf -i 10-250 -n 1)",
+            "echo \"POD_CIDR=" + pod_cidr + ".$RANDOM_NUMBER.0/24\" | sudo tee -a /etc/environment",
+            "echo \"AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\\\" '{print $4}')\" | sudo tee -a /etc/environment",
+            "echo \"HOSTEDZONE_NAME=" + zone_fqdn + "\" | sudo tee -a /etc/environment",
+            "echo \"INTERNAL_IP=$(curl -s http://169.254.169.254/1.0/meta-data/local-ipv4)\" | sudo tee -a /etc/environment"
         )
 
         # SecurityGroups
-        # Bastion Host
+        # Bastion LB
+        bastion_lb_sg = ec2.SecurityGroup(
+            self,
+            "bastion-lb-sg",
+            vpc=vpc,
+            allow_all_outbound=True,
+            description="Bastion-LB",
+        )
+        # Kubernetes Master Public LB
+        master_public_lb_sg = ec2.SecurityGroup(
+            self,
+            "k8s-right-hard-way-master-public-lb-sg",
+            vpc=vpc,
+            allow_all_outbound=True,
+            description="K8s MasterPublicLB",
+        )
+        # Kubernetes Master Private LB
+        master_private_lb_sg = ec2.SecurityGroup(
+            self,
+            "k8s-right-hard-way-master-private-lb-sg",
+            vpc=vpc,
+            allow_all_outbound=True,
+            description="K8s MasterPrivateLB",
+        )
+        # Bastion
         bastion_security_group = ec2.SecurityGroup(
             self,
             "bastion-security-group",
             vpc=vpc,
             allow_all_outbound=True,
-            description="Basion Host"
+            description="Bastion"
         )
-        bastion_security_group.add_ingress_rule(
-            peer=bastion_lb_sg,
-            connection=ec2.Port.tcp(22),
-            description="Allow SSH from Bastion LB"
-        )
-
-        # Kubernetes Master LoadBalancer, allow kubectl remote access from workstation IP
-        master_lb_sg = ec2.SecurityGroup(
+        # etcd
+        etcd_security_group = ec2.SecurityGroup(
             self,
-            "k8s-real-hard-way-master-lb-sg",
+            "etcd-security-group",
             vpc=vpc,
             allow_all_outbound=True,
-            description="Allow all egress and incoming traffic only port 6443 kubectl",
-        )
-        master_lb_sg.add_ingress_rule(
-            peer=ec2.Peer().ipv4(myipv4),
-            connection=ec2.Port(from_port=6443, to_port=6443, protocol=ec2.Protocol.TCP,
-                                string_representation="Allow kubectl port 6443 from workstation IPv4")
+            description="etcd"
         )
         # Kubernetes Master
         master_securiy_group = ec2.SecurityGroup(
@@ -374,63 +462,111 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             "worker-security-group",
             vpc=vpc,
             allow_all_outbound=True,
-            description="K8s worker"
+            description="K8s Worker"
         )
-        # Allow all incoming K8s Workers traffic on K8s Masters
-        master_securiy_group.add_ingress_rule(
-            peer=worker_security_group,
-            connection=ec2.Port.all_traffic(),
-            description="Allow all incoming K8s Worker traffic"
-        )
-        # Allow incoming SSH traffic from Bastion on Masters
-        master_securiy_group.add_ingress_rule(
-            peer=bastion_security_group,
+
+        # SecurityGroup Rules
+        # Bastion LB
+        bastion_lb_sg.add_ingress_rule(
+            peer=ec2.Peer().ipv4(myipv4),
             connection=ec2.Port.tcp(22),
-            description="Allow SSH from Bastion"
+            description="SSH: Workstation - MasterPublicLB"
         )
-        # Allow incoming API/kubectl traffic from Bastion on K8s Masters
-        master_securiy_group.add_ingress_rule(
-            peer=bastion_security_group,
+        # Master Public LB
+        master_public_lb_sg.add_ingress_rule(
+            peer=ec2.Peer().ipv4(myipv4),
             connection=ec2.Port.tcp(6443),
-            description="Allow kubectl from Bastion"
+            description="kubectl: Workstation - MasterPublicLB"
         )
-        # Allow incoming API/kubectl traffic from K8s Master LB on K8s Masters
-        master_securiy_group.add_ingress_rule(
-            peer=master_lb_sg,
-            connection=ec2.Port.tcp(6443),
-            description="Allow kubectl from Bastion"
-        )
-        # Allow all incoming K8s Masters traffic on K8s Workers
-        worker_security_group.add_ingress_rule(
+        master_public_lb_sg.add_ingress_rule(
             peer=master_securiy_group,
-            connection=ec2.Port.all_traffic(),
-            description="Allow all incoming K8s Master traffic"
+            connection=ec2.Port.tcp(6443),
+            description="kubeapi: Workers - MasterPublicLB"
         )
-        # Allow incoming SSH traffic from Bastion on K8s Masters
-        worker_security_group.add_ingress_rule(
-            peer=bastion_security_group,
+        # Master Private LB
+        # master_private_lb_sg.add_ingress_rule(
+        #     peer=master_securiy_group,
+        #     connection=ec2.Port.tcp(6443),
+        #     description="kubectl: Masters - MasterPrivateLB"
+        # )
+        # master_private_lb_sg.add_ingress_rule(
+        #     peer=worker_security_group,
+        #     connection=ec2.Port.tcp(6443),
+        #     description="kubeapi: Workers - MasterPrivateLB"
+        # )
+        master_private_lb_sg.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: ALL - MasterPrivateLB"
+        )
+        # Bastion Host
+        bastion_security_group.add_ingress_rule(
+            peer=bastion_lb_sg,
             connection=ec2.Port.tcp(22),
-            description="Allow SSH from Bastion"
+            description="SSH: Bastion-LB - Bastio"
         )
         # etcd
-        etcd_security_group = ec2.SecurityGroup(
-            self,
-            "etcd-security-group",
-            vpc=vpc,
-            allow_all_outbound=True,
-            description="etcd"
-        )
-        # Allow incoming SSH traffic from Bastion on etcds
         etcd_security_group.add_ingress_rule(
             peer=bastion_security_group,
             connection=ec2.Port.tcp(22),
-            description="Allow SSH from Bastion"
+            description="SSH: Bastion - Etcds"
         )
-        # Allow incoming etcd traffic from K8s Master on etcds
         etcd_security_group.add_ingress_rule(
             peer=master_securiy_group,
             connection=ec2.Port.tcp_range(start_port=2379, end_port=2380),
-            description="Allow etcd ports from K8s Master"
+            description="etcd: Masters - Etcds"
+        )
+        etcd_security_group.add_ingress_rule(
+            peer=etcd_security_group,
+            connection=ec2.Port.tcp_range(start_port=2379, end_port=2380),
+            description="etcd: Etcds - Etcds"
+        )
+        # K8s-Master
+        master_securiy_group.add_ingress_rule(
+            peer=worker_security_group,
+            connection=ec2.Port.all_traffic(),
+            description="ALL: Workers - Masters"
+        )
+        master_securiy_group.add_ingress_rule(
+            peer=bastion_security_group,
+            connection=ec2.Port.tcp(22),
+            description="SSH: Bastion - Masters"
+        )
+        master_securiy_group.add_ingress_rule(
+            peer=bastion_security_group,
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: Bastion - Masters"
+        )
+        master_securiy_group.add_ingress_rule(
+            peer=master_public_lb_sg,
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: MasterPublicLB - Masters"
+        )
+        master_securiy_group.add_ingress_rule(
+            peer=master_private_lb_sg,
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: MasterPrivateLB - Masters"
+        )
+        master_securiy_group.add_ingress_rule(
+            peer=worker_security_group,
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: Workers - Masters"
+        )
+        # K8s-Worker
+        worker_security_group.add_ingress_rule(
+            peer=master_securiy_group,
+            connection=ec2.Port.all_traffic(),
+            description="ALL: Master - Workers"
+        )
+        worker_security_group.add_ingress_rule(
+            peer=bastion_security_group,
+            connection=ec2.Port.tcp(22),
+            description="SSH: Bastion - Workers"
+        )
+        worker_security_group.add_ingress_rule(
+            peer=bastion_security_group,
+            connection=ec2.Port.tcp(6443),
+            description="kubectl: Bastion - Workers"
         )
 
         # Add SecurityGroups to resources
@@ -438,29 +574,12 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         etcd.add_security_group(etcd_security_group)
         master.add_security_group(master_securiy_group)
         worker.add_security_group(worker_security_group)
-
-        # Elastic Network Interfaces
-        i = 1
-        while i <= worker_max_capacity:
-            eni = ec2.CfnNetworkInterface(
-                self,
-                "eni" + str(i),
-                subnet_id=str(ec2.SubnetSelection(
-                    one_per_az=True,
-                    subnet_type=ec2.SubnetType.PRIVATE,
-                ).subnet_group_name),
-                description="ENI K8s Worker nodes",
-                tags=[
-                    core.CfnTag(
-                        key="Project",
-                        value=tag_project),
-                    core.CfnTag(
-                        key="Owner",
-                        value=tag_owner)
-                ],
-                private_ip_address='10.5.' + str(i) + '.100'
-            )
-            i += 1
+        cfn_master_public_lb.security_groups = [
+            master_public_lb_sg.security_group_id
+        ]
+        cfn_master_private_lb.security_groups = [
+            master_private_lb_sg.security_group_id
+        ]
 
         # Add specific Tags to resources
         core.Tag.add(
@@ -476,7 +595,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             value=tag_project + '-bastion-lb'
         )
         core.Tag.add(
-            master_lb,
+            master_public_lb,
             apply_to_launched_instances=True,
             key='Name',
             value=tag_project + '-master-lb'
@@ -499,3 +618,15 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
             key='Name',
             value=tag_project + '-k8s-worker'
         )
+        for subnet in vpc.private_subnets:
+            core.Tag.add(
+                subnet,
+                key='Attribute',
+                value='private'
+            )
+        for subnet in vpc.public_subnets:
+            core.Tag.add(
+                subnet,
+                key='Attribute',
+                value='public'
+            )
