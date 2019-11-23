@@ -6,17 +6,17 @@ with open("README.md") as fp:
 
 
 setuptools.setup(
-    name="cdk_python_k8s_right_way_aws",
-    version="1.0.0",
+    name="cdk_python_k8s_real_way_aws",
+    version="2.1.1",
 
-    description="Kubernetes The Real Hard Way (AWS) CDK Python app",
+    description="Kubernetes The (real) Hard Way (AWS) CDK Python app",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
     author="author",
 
-    package_dir={"": "cdk_python_k8s_right_way_aws"},
-    packages=setuptools.find_packages(where="cdk_python_k8s_right_way_aws"),
+    package_dir={"": "cdk_python_k8s_real_way_aws"},
+    packages=setuptools.find_packages(where="cdk_python_k8s_real_way_aws"),
 
     install_requires=[
         "aws-cdk.core",

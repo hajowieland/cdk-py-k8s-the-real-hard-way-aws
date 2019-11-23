@@ -21,7 +21,7 @@ from operator import itemgetter
 
 # Global Tags applied to all resources
 # Project Tag
-tag_project = 'k8s-the-right-hard-way-aws'
+tag_project = 'k8s-the-real-hard-way-aws'
 
 # Owner Tag (your name)
 tag_owner = 'napo.io'
@@ -112,7 +112,7 @@ default_tags={
 }
 
 
-class CdkPythonK8SRightWayAwsStack(core.Stack):
+class CdkPythonK8SRealWayAwsStack(core.Stack):
 
     def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, tags=default_tags, **kwargs)
@@ -120,7 +120,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # VPC
         vpc = ec2.Vpc(
             self,
-            'k8s-right-hard-way-vpc',
+            'k8s-real-hard-way-vpc',
             cidr=vpc_cidr,
             subnet_configuration=[
                 ec2.SubnetConfiguration(
@@ -147,7 +147,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Get HostedZone ID from HostedZone Name
         zoneid = route53.HostedZone.from_lookup(
             self,
-            "k8s-right-hard-way-zone",
+            "k8s-real-hard-way-zone",
             domain_name=zone_fqdn
         )
         zoneid_str = zoneid.hosted_zone_id
@@ -293,7 +293,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Public Load Balancer (for remote kubectl access)
         master_public_lb = elb.LoadBalancer(
             self,
-            "k8s-right-hard-way-master-public-lb",
+            "k8s-real-hard-way-master-public-lb",
             vpc=vpc,
             internet_facing=True,
             health_check=elb.HealthCheck(
@@ -313,7 +313,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Private Load Balancer (fronting kube-apiservers)
         master_private_lb = elb.LoadBalancer(
             self,
-            "k8s-right-hard-way-master-private-lb",
+            "k8s-real-hard-way-master-private-lb",
             vpc=vpc,
             internet_facing=False,
             health_check=elb.HealthCheck(
@@ -419,7 +419,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Kubernetes Master Public LB
         master_public_lb_sg = ec2.SecurityGroup(
             self,
-            "k8s-right-hard-way-master-public-lb-sg",
+            "k8s-real-hard-way-master-public-lb-sg",
             vpc=vpc,
             allow_all_outbound=True,
             description="K8s MasterPublicLB",
@@ -427,7 +427,7 @@ class CdkPythonK8SRightWayAwsStack(core.Stack):
         # Kubernetes Master Private LB
         master_private_lb_sg = ec2.SecurityGroup(
             self,
-            "k8s-right-hard-way-master-private-lb-sg",
+            "k8s-real-hard-way-master-private-lb-sg",
             vpc=vpc,
             allow_all_outbound=True,
             description="K8s MasterPrivateLB",
