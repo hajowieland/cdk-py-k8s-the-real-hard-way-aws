@@ -25,9 +25,9 @@ _Default values - you can adapt all of them to your needs_
 
 * AWS CDK Python
 * 1x VPC, 3x Public Subnets, 3x Private Subnets, Route Tables, Routes
-* 3x Worker Nodes _(editable)_
-* 3x Master Nodes _(editable)_
-* 3x Etcd Nodes _(editable)_
+* 3x Worker Nodes
+* 3x Master Nodes
+* 3x Etcd Nodes
 * 1x Bastion Host
 * Route53 Records for internal & external IPv4 addresses
 * 1x Public LoadBalancer for Master Nodes (external kubectl access)
