@@ -21,6 +21,8 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 
 ## Features
 
+_Default values - you can adapt all of them to your needs_
+
 * AWS CDK Python
 * 1x VPC, 3x Public Subnets, 3x Private Subnets, Route Tables, Routes
 * 3x Worker Nodes _(editable)_
