@@ -15,6 +15,9 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 
 * Existing AWS EC2 Key Pair
 * Existing AWS Route53 Public Hosted Zone
+* aws-cli Profile
+* AWS CDK (`npm install -g cdk`)
+* Python3
 
 ## Features
 
@@ -27,7 +30,7 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 * Route53 Records for internal & external IPv4 addresses
 * 1x Public LoadBalancer for Master Nodes (external kubectl access)
 * 1x Private LoadBalancer for Master Nodes (fronting kube-apiservers)
-* Gets most recent Ubuntu AMI for all regions
+* Gets most recent Ubuntu AMI for all regions (via Boto3)
 * Install awscli, cfssl, cfssl_json via UserData
 * Allows external access from workstation IPv4 address only (to Bastion & MasterPublicLB)
 
