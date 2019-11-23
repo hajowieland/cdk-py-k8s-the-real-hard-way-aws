@@ -1,9 +1,9 @@
 
-# CDK Python Kubernetes the (right) hard way on AWS!
+# CDK Python - Kubernetes The (real) Hard Way on AWS!
 
-This little project creates the infrastructure in CDK Python for my blog post [Kubernetes the (right) hard way on AWS](https://napo.io/posts/kubernetes-the-right-hard-way-on-aws/).
+This little project creates the infrastructure in CDK Python for my blog post [Kubernetes The (real) Hard Way on AWS](https://napo.io/posts/kubernetes-the-real-hard-way-on-aws/).
 
-> Terraform code available 🔗[HERE](https://github.com/hajowieland/terraform-k8s-the-right-hard-way-aws)
+> Terraform code available 🔗[HERE](https://github.com/hajowieland/terraform-k8s-the-real-hard-way-aws)
 
 
 You can practice creating a multi node K8s Cluster yourself for training purposes or CKA exam preparation.
@@ -60,7 +60,7 @@ You can practice creating a multi node K8s Cluster yourself for training purpose
 | ssh\_key\_pair | AWS EC2 Key Pair name | string | `''` |
 | pod\_cidr | Pod CIDR network first octets (for `POD_CIDR` envvar) | string | `'10.200'` |
 | tag\_owner | Owner Tag for all resources | string | `'napo.io'` |
-| tag\_project | Project Tag for all resources | string | `'k8s-the-right-hard-way-aws'` |
+| tag\_project | Project Tag for all resources | string | `'k8s-the-real-hard-way-aws'` |
 | vpc\_cidr | AWS VPC network CIDR | string | `'10.5.0.0/16'` |
 | zone\_fqdn | AWS Route53 Hosted Zone name | string | `''` |
 
