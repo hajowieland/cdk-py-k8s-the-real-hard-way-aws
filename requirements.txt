@@ -30,7 +30,7 @@ boto3==1.10.14
 botocore==1.13.14
 cattrs==0.9.0
 -e git+git@github.com:hajowieland/cdk-py-k8s-the-right-hard-way-aws.git@e1e853bf766709e03699da84d9aaec564110c5a5#egg=cdk_python_k8s_right_way_aws
-certifi==2022.12.7
+certifi==2023.7.22
 chardet==3.0.4
 docutils==0.15.2
 idna==2.8
